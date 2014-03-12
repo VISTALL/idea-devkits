@@ -181,7 +181,7 @@
       <module fileurl="file://$PROJECT_DIR$/plugin.iml" filepath="$PROJECT_DIR$/plugin.iml" />
     </modules>
   </component>
-  <component name="ProjectRootManager" version="2" assert-keyword="false" jdk-15="false" project-jdk-name="IDEA 7971" />
+  <component name="ProjectRootManager" version="2" assert-keyword="false" jdk-15="false" project-jdk-name="IDEA 9952" />
   <component name="RmicSettings">
     <option name="IS_EANABLED" value="false" />
     <option name="DEBUGGING_INFO" value="true" />

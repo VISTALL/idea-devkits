@@ -20,7 +20,7 @@ import java.util.StringTokenizer;
 /**
  * @author max
  */
-public class ComparingReferencesInspection extends LocalInspectionTool {
+public class ComparingReferencesInspection extends BaseJavaLocalInspectionTool {
   private static final Logger LOG = Logger.getInstance("#com.intellij.codeInspection.ComparingReferencesInspection");
 
   private LocalQuickFix myQuickFix = new MyQuickFix();
@@ -55,11 +55,11 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
     return false;
   }
 
-  public ProblemDescriptor[] checkMethod(PsiMethod method, InspectionManager manager, boolean isOnTheFly) {
+  public ProblemDescriptor[] checkMethod(@NotNull PsiMethod method, @NotNull InspectionManager manager, boolean isOnTheFly) {
     return analyzeCode(method.getBody(), manager);
   }
 
-  public ProblemDescriptor[] checkClass(PsiClass aClass, InspectionManager manager, boolean isOnTheFly) {
+  public ProblemDescriptor[] checkClass(@NotNull PsiClass aClass, @NotNull InspectionManager manager, boolean isOnTheFly) {
     ArrayList<ProblemDescriptor> problemList = null;
     PsiClassInitializer[] initializers = aClass.getInitializers();
     for (PsiClassInitializer initializer : initializers) {
@@ -79,12 +79,12 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
     if (where == null) return null;
 
     final ArrayList[] problemList = new ArrayList[]{null};
-    where.accept(new PsiRecursiveElementVisitor() {
-      public void visitMethod(PsiMethod method) {}
+    where.accept(new JavaRecursiveElementVisitor() {
+      @Override public void visitMethod(PsiMethod method) {}
 
-      public void visitClass(PsiClass aClass) {}
+      @Override public void visitClass(PsiClass aClass) {}
 
-      public void visitBinaryExpression(PsiBinaryExpression expression) {
+      @Override public void visitBinaryExpression(PsiBinaryExpression expression) {
         super.visitBinaryExpression(expression);
         IElementType opSign = expression.getOperationSign().getTokenType();
         if (opSign == JavaTokenType.EQEQ || opSign == JavaTokenType.NE) {
@@ -129,7 +129,7 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
         if (rExpr == null)
           return;
 
-        PsiElementFactory factory = PsiManager.getInstance(project).getElementFactory();
+        PsiElementFactory factory = JavaPsiFacade.getInstance(project).getElementFactory();
         PsiMethodCallExpression equalsCall = (PsiMethodCallExpression)factory.createExpressionFromText("a.equals(b)", null);
 
         equalsCall.getMethodExpression().getQualifierExpression().replace(lExpr);

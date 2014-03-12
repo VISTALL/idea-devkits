@@ -45,7 +45,7 @@ import org.jetbrains.annotations.Nullable;
     return false;
   }
 
-  public void invoke(Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
+  public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
     final int offset = editor.getCaretModel().getOffset();
     final PsiElement element = file.findElementAt(offset);
     PsiConditionalExpression conditionalExpression = PsiTreeUtil.getParentOfType(element,
@@ -53,7 +53,7 @@ import org.jetbrains.annotations.Nullable;
     if (conditionalExpression == null) return;
     if (conditionalExpression.getThenExpression() == null || conditionalExpression.getElseExpression() == null) return;
 
-    final PsiElementFactory factory = PsiManager.getInstance(project).getElementFactory();
+    final PsiElementFactory factory = JavaPsiFacade.getInstance(project).getElementFactory();
 
     PsiElement originalStatement = PsiTreeUtil.getParentOfType(conditionalExpression, PsiStatement.class, false);
     while (originalStatement instanceof PsiForStatement) {
