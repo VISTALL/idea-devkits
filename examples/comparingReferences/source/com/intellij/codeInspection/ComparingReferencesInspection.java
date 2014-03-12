@@ -8,6 +8,7 @@ import com.intellij.psi.tree.IElementType;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NonNls;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -24,16 +25,20 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
 
   private LocalQuickFix myQuickFix = new MyQuickFix();
 
-  @NonNls public String CHECKED_CLASSES = "java.lang.String;java.util.Date";
+  @SuppressWarnings({"WeakerAccess"}) @NonNls public String CHECKED_CLASSES = "java.lang.String;java.util.Date";
+  @NonNls private static final String DESCRIPTION_TEMPLATE = InspectionsBundle.message("inspection.comparing.references.problem.descriptor");
 
+  @NotNull
   public String getDisplayName() {
     return InspectionsBundle.message("inspection.comparing.references.display.name");
   }
 
+  @NotNull
   public String getGroupDisplayName() {
     return GroupNames.BUGS_GROUP_NAME;
   }
 
+  @NotNull
   public String getShortName() {
     return "ComparingReferences";
   }
@@ -55,20 +60,19 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
   }
 
   public ProblemDescriptor[] checkClass(PsiClass aClass, InspectionManager manager, boolean isOnTheFly) {
-    ArrayList problemList = null;
+    ArrayList<ProblemDescriptor> problemList = null;
     PsiClassInitializer[] initializers = aClass.getInitializers();
-    for (int i = 0; i < initializers.length; i++) {
-      PsiClassInitializer initializer = initializers[i];
+    for (PsiClassInitializer initializer : initializers) {
       ProblemDescriptor[] problemDescriptors = analyzeCode(initializer, manager);
       if (problemDescriptors != null) {
-        if (problemList == null) problemList = new ArrayList();
+        if (problemList == null) problemList = new ArrayList<ProblemDescriptor>();
         problemList.addAll(Arrays.asList(problemDescriptors));
       }
     }
 
     return problemList == null
            ? null
-           : (ProblemDescriptor[])problemList.toArray(new ProblemDescriptor[problemList.size()]);
+           : problemList.toArray(new ProblemDescriptor[problemList.size()]);
   }
 
   private ProblemDescriptor[] analyzeCode(PsiElement where, final InspectionManager manager) {
@@ -93,8 +97,7 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
 
           if (isCheckedType(lType) || isCheckedType(rType)) {
             if (problemList[0] == null) problemList[0] = new ArrayList();
-            problemList[0].add(manager.createProblemDescriptor(expression,
-                                                               InspectionsBundle.message("inspection.comparing.references.problem.descriptor", "#ref #loc"),
+            problemList[0].add(manager.createProblemDescriptor(expression, DESCRIPTION_TEMPLATE,
                                                                myQuickFix,
                                                                ProblemHighlightType.GENERIC_ERROR_OR_WARNING));
           }
@@ -107,17 +110,17 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
            : (ProblemDescriptor[])problemList[0].toArray(new ProblemDescriptor[problemList[0].size()]);
   }
 
-  private boolean isNullLiteral(PsiExpression expr) {
-    //noinspection HardCodedStringLiteral
+  private static boolean isNullLiteral(PsiExpression expr) {
     return expr instanceof PsiLiteralExpression && "null".equals(expr.getText());
   }
 
   private static class MyQuickFix implements LocalQuickFix {
+    @NotNull
     public String getName() {
       return InspectionsBundle.message("inspection.comparing.references.use.quickfix");
     }
 
-    public void applyFix(Project project, ProblemDescriptor descriptor) {
+    public void applyFix(@NotNull Project project, @NotNull ProblemDescriptor descriptor) {
       try {
         PsiBinaryExpression binaryExpression = (PsiBinaryExpression)descriptor.getPsiElement();
         IElementType opSign = binaryExpression.getOperationSign().getTokenType();
@@ -145,6 +148,7 @@ public class ComparingReferencesInspection extends LocalInspectionTool {
       }
     }
 
+    @NotNull
     public String getFamilyName() {
       return getName();
     }

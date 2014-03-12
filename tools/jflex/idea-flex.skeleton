@@ -30,6 +30,9 @@
       the source of the yytext() string */
   private CharSequence zzBuffer = "";
 
+  /** this buffer may contains the current text array to be matched when it is cheap to acquire it */
+  private char[] zzBufferArray;
+
   /** the textposition at the last accepting state */
   private int zzMarkedPos;
 
@@ -66,11 +69,24 @@
     return getTokenStart() + yylength();
   }
 
-  public void reset(CharSequence buffer, int initialState){
+  public void reset(CharSequence buffer, int start, int end,int initialState){
     zzBuffer = buffer;
-    zzCurrentPos = zzMarkedPos = zzStartRead = 0;
+    zzBufferArray = com.intellij.util.text.CharArrayUtil.fromSequenceWithoutCopying(buffer);
+    zzCurrentPos = zzMarkedPos = zzStartRead = start;
     zzPushbackPos = 0;
     zzAtEOF  = false;
+    zzAtBOL = true;
+    zzEndRead = end;
+    yybegin(initialState);
+  }
+
+  // For Demetra compatibility
+  public void reset(CharSequence buffer, int initialState){
+    zzBuffer = buffer;
+    zzBufferArray = null; 
+    zzCurrentPos = zzMarkedPos = zzStartRead = 0;
+    zzPushbackPos = 0;
+    zzAtEOF = false;
     zzAtBOL = true;
     zzEndRead = buffer.length();
     yybegin(initialState);
@@ -126,7 +142,7 @@
    * @return the character at position pos
    */
   public final char yycharat(int pos) {
-    return zzBuffer.charAt(zzStartRead+pos);
+    return zzBufferArray != null ? zzBufferArray[zzStartRead+pos]:zzBuffer.charAt(zzStartRead+pos);
   }
 
 
@@ -198,6 +214,7 @@
     int zzMarkedPosL;
     int zzEndReadL = zzEndRead;
     CharSequence zzBufferL = zzBuffer;
+    char[] zzBufferArrayL = zzBufferArray;
     char [] zzCMapL = ZZ_CMAP;
 
 --- local declarations
