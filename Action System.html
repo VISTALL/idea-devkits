@@ -1,0 +1,268 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>IntelliJ IDEA Action System</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<style type="text/css">
+.S0 {
+	font-family: Verdana;
+	color: #000000;
+	font-size: 10pt;
+}
+.S1 {
+	color: #000080;
+}
+.S3 {
+	color: #008080;
+}
+.S6 {
+	color: #7F007F;
+}
+.S8 {
+	color: #800080;
+}
+.S9 {
+	color: #808000;
+}
+.S11 {
+	color: #000080;
+}
+.S19 {
+	color: #608060;
+}
+span {
+	font-family: Verdana;
+	font-size: 10pt;
+}
+</style>
+</head>
+
+<body>
+<h1>IntelliJ IDEA Action System</h1>
+
+<h2>Executing and Updating Actions</h2>
+
+<p>The system of <i>actions</i> allows plugins to add their own items to IDEA menus and toolbars.
+  An action is a class, derived from the <a href="help/openapi/com/intellij/openapi/actionSystem/AnAction.html">AnAction</a>
+  class, whose <code>actionPerformed</code> method is called when the menu item or toolbar button is selected.
+  For example, one of the action classes is responsible for the "File | Open File..." menu item and for the
+  "Open File" toolbar button.</p>
+
+<p>Actions are organized into <i>groups</i>, which, in turn, can contain other groups. A group of actions can form
+  a toolbar or a menu. Subgroups of the group can form submenus of the menu.</p>
+<p>Every action and action group has an unique identifier. Identifiers of
+  standard IDEA actions are defined in the
+  <a href="help/openapi/com/intellij/openapi/actionSystem/IdeActions.html">IdeActions</a> class.</p>
+
+<p>Every action can be included in multiple groups, and thus appear in multiple places within the IDEA user interface.
+  Different places where actions can appear are defined by constants in the
+  <a href="help/openapi/com/intellij/openapi/actionSystem/ActionPlaces.html">ActionPlaces</a> interface.
+  For every place where the action appears, a new
+  <a href="help/openapi/com/intellij/openapi/actionSystem/Presentation.html">Presentation</a> is created. Thus, the
+  same action can have different text or icons when it appears in different places of the user interface.
+  Different presentations for the action are created by copying the presentation returned by the
+  <code>AnAction.getTemplatePresentation()</code> method. A presentation for an action used in a specific
+  place can be retrieved by calling <code>AnAction.getPresentation(<i>place</i>)</code>.</p>
+
+<p>To update the state of the action, the method <code>AnAction.update()</code> is periodically called by IDEA.
+  The object of type <a href="help/openapi/com/intellij/openapi/actionSystem/AnActionEvent.html">AnActionEvent</a>
+  passed to this method carries the information about the current context for the action, and in particular,
+  the specific presentation which needs to be updated. The
+  <a href="help/openapi/com/intellij/openapi/actionSystem/DataContext.html">DataContext</a> object, which can be
+  retrieved from the action event by calling <code>getDataContext()</code>, provides the information about the
+  current state of the IDE, including the active project, the selected file, the selection in the editor and so on.
+  Different data items which can be retrieved from the <code>DataContext</code> are defined by constants in the
+  <a href="help/openapi/com/intellij/openapi/actionSystem/DataConstants.html">DataConstants</a> class.</p>
+
+<p>The <code>AnActionEvent</code> instance is also passed to the <code>actionPerformed</code> method.</p>
+
+<h2>Registering Actions</h2>
+
+<p>There are two main ways to register an action: either by listing it in the
+  <code>&lt;actions&gt;</code> section of the <code>plugin.xml</code> file, or through Java code.</p>
+
+<h3>Registering Actions in plugin.xml</h3>
+
+<p>Registering actions in plugin.xml is demonstrated in the following example.
+The example section of plugin.xml demonstrates all elements which can be used in
+the &lt;actions&gt; section, and describes the meaning of each element.</p>
+<p><span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Actions --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;actions&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span class="S9">&lt;!--
+  The &lt;action&gt; element defines an action to register.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;id&quot; attribute specifies an unique identifier for the action.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The mandatory &quot;class&quot;
+attribute specifies the full-qualified name of the class implementing the
+action.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The mandatory &quot;text&quot;
+attribute specifies the text of the action (tooltip for toolbar button or text
+for menu item).<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;description&quot;
+attribute specifies the text which is displayed in the status bar when the
+action is focused.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;icon&quot;
+attribute specifies the icon which is displayed on the toolbar button or next to
+the menu item. --&gt;<br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;action</span><span class="S8">
+  </span><span class="S3">id</span><span class="S8">=</span><span class="S6">"VssIntegration.GarbageCollection"</span><span class="S8">
+  </span><span class="S3">class</span><span class="S8">=</span><span class="S6">"com.foo.impl.CollectGarbage"</span><span class="S8">
+  </span><span class="S3">text</span><span class="S8">=</span><span class="S6">"Collect
+  _Garbage"</span><span class="S8"> </span><span class="S3">description</span><span class="S8">=</span><span class="S6">"Run
+  garbage collector"</span><span class="S1"> <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S3">icon</span><span class="S8">=</span><span class="S6">"icons/garbage.png&quot;</span><span class="S1">&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span class="S9">&lt;!--
+  The &lt;add-to-group&gt; node specifies that the action should be added to an
+existing group. An action can be added to several groups.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;group-id&quot; attribute specifies the ID of the group to which the
+action is added. <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The group must be implemented by an instance of the DefaultActionGroup class.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;anchor&quot; attribute specifies the position of the action in the
+group relative to other actions. It can have the values<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&quot;first&quot;, &quot;last&quot;, &quot;before&quot; and &quot;after&quot;.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The &quot;relative-to-action&quot; attribute is mandatory if the anchor is set to &quot;before&quot;
+and &quot;after&quot;, and specifies the action before or after which<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+the current action is inserted. --&gt;</span><span class="S1"><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;add-to-group </span>
+<span class="S3">group-id</span><span class="S8">=</span><span class="S6">"ToolsMenu&quot;</span><span class="S1">
+</span><span class="S3">relative-to-action</span><span class="S8">=</span><span class="S6">"GenerateJavadoc&quot;</span><span class="S1">
+</span><span class="S3">anchor</span><span class="S8">=</span><span class="S6">"after"</span><span class="S1">/&gt;</span><span class="S0"><br />
+  </span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span class="S9">&lt;!--
+  The &lt;keyboard-shortcut&gt; node specifies the keyboard shortcut for the action.
+An action can have several keyboard shortcuts.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;first-keystroke&quot; attribute specifies the first keystroke of the
+action. The key strokes are specified according to the regular Swing rules.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The optional &quot;second-keystroke&quot; attribute specifies the second keystroke of the
+action.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;keymap&quot; attribute specifies the keymap for which the action is
+active. IDs of the standard keymaps are defined as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+constants in the com.intellij.openapi.keymap.KeymapManager class. --&gt;</span><span class="S1"><br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;keyboard-shortcut</span><span class="S8">
+  </span><span class="S3">first-keystroke</span><span class="S8">=</span><span class="S6">"control
+  alt G"</span><span class="S8"> </span><span class="S3">second-keystroke</span><span class="S8">=</span><span class="S6">"C"</span><span class="S8">
+  </span><span class="S3">keymap</span><span class="S8">=</span><span class="S6">"$default"</span><span class="S11">/&gt;<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span class="S9">
+&lt;!-- The &lt;mouse-shortcut&gt; node specifies the mouse shortcut for the action. An
+action can have several mouse shortcuts.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;keystroke&quot; attribute specifies the clicks and modifiers for the
+action. It is defined as a sequence of words separated by spaces:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&quot;button1&quot;, &quot;button2&quot;, &quot;button3&quot; for the mouse buttons; &quot;shift&quot;, &quot;control&quot;,
+&quot;meta&quot;, &quot;alt&quot;, &quot;altGraph&quot; for the modifier keys;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&quot;doubleClick&quot; if the action is activated by a double-click of the button.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;keymap&quot; attribute specifies the keymap for which the action is
+active. IDs of the standard keymaps are defined as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+constants in the com.intellij.openapi.keymap.KeymapManager class. --&gt;</span><span class="S1"><br>
+</span><span class="S11">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><span class="S1">&lt;mouse-shortcut</span><span class="S8">
+  </span><span class="S3">keystroke</span><span class="S8">=</span><span class="S6">"control
+  button3 doubleClick&quot;</span><span class="S8"> </span><span class="S3">keymap</span><span class="S8">=</span><span class="S6">"$default"</span><span class="S11">/&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/action&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><span class="S9">&lt;!--
+  The &lt;group&gt; element defines an action group. &lt;action&gt;, &lt;group&gt; and &lt;separator&gt;
+elements defined within it are automatically included in the group.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The mandatory &quot;id&quot; attribute specifies an unique identifier for the action.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;class&quot;
+attribute specifies the full-qualified name of the class implementing the group.
+If not specified,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+com.intellij.openapi.actionSystem.DefaultActionGroup is used.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;text&quot;
+attribute specifies the text of the group (text for the menu item showing the
+submenu).<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;description&quot;
+attribute specifies the text which is displayed in the status bar when the group
+is focused.<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
+<span class="S9">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The optional &quot;icon&quot;
+attribute specifies the icon which is displayed on the toolbar button or next to
+the group.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The optional &quot;popup&quot; attribute specifies how the group is presented in the menu.
+If a group has popup=&quot;true&quot;, actions in it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+are placed in a submenu; for popup=&quot;false&quot;, actions are displayed as a section
+of the same menu delimited by separators. --&gt;<br>
+</span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;group
+</span><span class="S3">class</span><span class="S8">=</span><span class="S6">"com.foo.impl.MyActionGroup"</span><span class="S8">
+  </span><span class="S3">id</span><span class="S8">=</span><span class="S6">"TestActionGroup&quot; </span>
+<span class="S3">text</span><span class="S8">=</span><span class="S6">"Test
+Group&quot; </span><span class="S3">description</span><span class="S8">=</span><span class="S6">"Group
+with test actions&quot; </span><span class="S3"><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+icon</span><span class="S8">=</span><span class="S6">&quot;icons/testgroup.png&quot; </span>
+<span class="S3">popup</span><span class="S8">=</span><span class="S6">&quot;true&quot;</span><span class="S1">&gt;<br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;action</span><span class="S8">
+  </span><span class="S3">id</span><span class="S8">=</span><span class="S6">"VssIntegration.TestAction"</span><span class="S8">
+  </span><span class="S3">class</span><span class="S8">=</span><span class="S6">"com.foo.impl.TestAction"</span><span class="S8">
+  </span><span class="S3">text</span><span class="S8">=</span><span class="S6">"My
+Test Action&quot;</span><span class="S8"> </span><span class="S3">description</span><span class="S8">=</span><span class="S6">"My
+test action&quot;</span><span class="S1">/&gt;</span></span><span class="S9"><span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;!--
+  The &lt;separator&gt; element defines a separator between actions. It can also have
+an &lt;add-to-group&gt; child element. --&gt;</span></span><span><span class="S0"><br />
+  </span><span class="S1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&lt;separator/&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;group
+</span><span class="S3">id</span><span class="S8">=</span><span class="S6">"TestActionGroup&quot;</span><span class="S1">/&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><span class="S9">&lt;!--
+  The &lt;reference&gt; element allows to add an existing action to the group. The
+mandatory &quot;ref&quot; attribute specifies the ID of the action to add. --&gt;</span><span class="S1"><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;reference
+</span><span class="S3">ref</span><span class="S8">=</span><span class="S6">"EditorCopy&quot;</span><span class="S1">/&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;add-to-group
+</span><span class="S3">group-id</span><span class="S8">=</span><span class="S6">"MainMenu&quot;</span><span class="S1">
+</span><span class="S3">relative-to-action</span><span class="S8">=</span><span class="S6">"HelpMenu&quot;</span><span class="S1">
+</span><span class="S3">anchor</span><span class="S8">=</span><span class="S6">"before"</span><span class="S1">/&gt;
+<br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/group&gt;<br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/actions&gt;</span><span class="S0"><br />
+  &nbsp;</span></span></p>
+
+<h3>Registering Actions from Code</h3>
+
+<p>To register an action from code, two steps are required. First, an instance of the class derived
+  from <code>AnAction</code> must be passed to the <code>registerAction</code> method of the
+  <a href="help/openapi/com/intellij/openapi/actionSystem/ActionManager.html">ActionManager</a> class,
+  to associate the action with an ID. Second, the action needs to be added to one or more groups.
+  To get an instance of an action group by ID, it is necessary to call <code>ActionManager.getAction()</code>
+  and cast the returned value to the <code>DefaultActionGroup</code> class.</p>
+
+<h2>Building UI from Actions</h2>
+
+<p>If a plugin needs to include a toolbar or popup menu built from a group of actions in its own user
+  interface, that can be accomplished through the
+  <a href="help/openapi/com/intellij/openapi/actionSystem/ActionPopupMenu.html">ActionPopupMenu</a> and
+  <a href="help/openapi/com/intellij/openapi/actionSystem/ActionToolbar.html">ActionToolbar</a> classes.
+  These objects can be created through calls to <code>ActionManager.createActionPopupMenu</code> and
+  <code>ActionManager.createActionToolbar</code>. To get a Swing component from such an object, simply
+  call the <code>getComponent()</code> method.</p>
+
+</body>
+</html>

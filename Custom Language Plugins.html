@@ -1,0 +1,847 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Developing Custom Language Plugins for IntelliJ IDEA 5.0</title>
+<base target="_blank">
+</head>
+
+<body>
+
+<h1>Developing Custom Language Plugins for IntelliJ IDEA 5.0</h1>
+<p><i>Dmitry Jemerov &lt;<a href="mailto:yole@jetbrains.com">yole@jetbrains.com</a>&gt;<br>
+Last updated: 30 Sep 2005</i></p>
+<p>One of the major new features of IntelliJ IDEA 5.0 is the Language API. Using 
+the Language API, plugin developers can extend IntelliJ IDEA's powerful code navigation 
+and analysis capabilities, which were previously available only for Java, to 
+other programming languages. IntelliJ IDEA itself has used the Language API to add 
+support for JavaScript and .properties files. A number of third-party custom 
+language plugins either have already been released or are in development, adding 
+support for <a href="http://plugins.intellij.net/plugins/view/?id=XPathView">
+XPath</a>, <a href="http://groovy.codehaus.org/IntelliJ+IDEA+Plugin">Groovy</a>, 
+Python and other languages.</p>
+<p>The set of IntelliJ IDEA features which are supported for custom languages includes:</p>
+<ul>
+	<li><a target="_self" href="#syntax_highlighting">Syntax highlighting and error highlighting</a>;</li>
+	<li><a target="_self" href="#references">Go to Declaration</a> (including Quick Definition 
+	Lookup);</li>
+	<li><a target="_self" href="#code_completion">Code completion</a>;</li>
+	<li><a target="_self" href="#find_usages">Find Usages</a>;</li>
+	<li><a target="_self" href="#rename_refactoring">Rename</a> and 
+	<a target="_self" href="#safe_delete_refactoring">Safe Delete</a> refactorings;</li>
+	<li><a target="_self" href="#code_formatter">Code formatter</a>;</li>
+	<li><a target="_self" href="#code_inspections">Code inspections and intentions</a>;</li>
+	<li><a target="_self" href="#structure_view">Structure View</a> (including the File 
+	Structure Popup);</li>
+	<li><a target="_self" href="#surround_with">Surround With</a>;</li>
+	<li><a target="_self" href="#go_to_class_symbol">Go to Class, Go to Symbol</a>;</li>
+	<li><a target="_self" href="#brace_matching">Brace matching</a>;</li>
+	<li><a target="_self" href="#code_folding">Code folding</a>;</li>
+	<li><a target="_self" href="#comment_code">Comment Code</a>;</li>
+	<li><a target="_self" href="#to_do_view">To Do view</a>.</li>
+</ul>
+<p>In addition, IDEA provides a powerful framework on which additional 
+intelligence features, like refactorings and code analysis, can be implemented.</p>
+<p>This article will explain the main concepts of the Language API and will 
+guide you through the sequence of steps which are usually required to develop a 
+custom language plugin. You can obtain additional information about the Language 
+API from the JavaDoc comments for the Language API classes and from the source 
+code of the JavaScript plugin, which is included in the IDEA Plugin Development 
+Package.</p>
+<p>If you have any questions or comments related to the Language API or any 
+other aspects of IntelliJ IDEA plugin development, feel free to ask them in the
+<a href="news://news.jetbrains.com/jetbrains.intellij.openapi">
+jetbrains.intellij.openapi</a> newsgroup on the news.jetbrains.com news server, 
+or in the corresponding <a href="http://intellij.net/forums/forum.jsp?forum=23">
+Web forum</a>. The newsgroup is monitored by JetBrains developers who will be 
+able to help you with the development.</p>
+<p>(Note: IDEA 5.0.1 and 5.0.2 contain a number of important bug fixes and some 
+improvements related to the Language API. Some things may not work as described here on the original IDEA 
+5.0 release.)</p>
+<h2>Registering a File Type</h2>
+<p>The first step in developing a custom language plugin is registering a file 
+type the language will be associated with. IDEA determines the type of a 
+file by looking at its extension. Thus, a custom language can only be associated 
+with specific file extensions &ndash; it is not 
+currently possible to create a language which will be applied to files with 
+specific content, like, for example, a specific XML root namespace.</p>
+<p>A custom language file type is a class derived from 
+<a href="help/openapi/com/intellij/openapi/fileTypes/LanguageFileType.html">LanguageFileType</a>, which passes a 
+<a href="help/openapi/com/intellij/lang/Language.html">Language</a> 
+implementation class to its base class constructor. The file type is typically 
+registered in the <code>initComponent()</code> method of an application component (class 
+implementing the 
+<a href="help/openapi/com/intellij/openapi/components/ApplicationComponent.html">ApplicationComponent</a> 
+interface). The registration of the file type is performed by a call to
+<a href="help/openapi/com/intellij/openapi/fileTypes/FileTypeManager.html#registerFileType(com.intellij.openapi.fileTypes.FileType, java.lang.String[])">
+FileTypeManager.getInstance().registerFileType()</a>.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JavaScriptSupportLoader.java.html#l30">
+	Example: Registering LanguageFileType for JavaScript</a></p>
+</blockquote>
+<p>To verify that the file type is indeed registered correctly, you can 
+implement the <code>LanguageFileType.getIcon()</code> method and verify that the correct icon 
+is displayed for files which have the extension associated with your file type.</p>
+
+
+
+<h2>Implementing a Lexer</h2>
+<p>The lexer (lexical analyzer) defines how the contents of a file is broken 
+into tokens. The lexer serves as a foundation for nearly all of the features of 
+custom language plugins, from basic syntax highlighting to advanced code 
+analysis features. The API for the lexer is defined by the
+<a href="help/openapi/com/intellij/lexer/Lexer.html">
+Lexer</a> interface.</p>
+<p>IDEA invokes the lexer in three main contexts, and the plugin can provide 
+different lexer implementations for these contexts:</p>
+<ul>
+	<li>syntax highlighting: the lexer is expected to be returned from 
+	<code>Language.getSyntaxHighlighter().getHighlightingLexer()</code>;</li>
+	<li>building the syntax tree of a file: the lexer is expected to be returned from 
+	<code>Language.getParserDefinition().createLexer()</code>;</li>
+	<li>building the index of the words contained in the file: if the 
+	lexer-based words scanner implementation is used, the lexer is passed to the 
+	<a href="help/openapi/com/intellij/lang/cacheBuilder/DefaultWordsScanner.html">DefaultWordsScanner</a> constructor.</li>
+</ul>
+<p>The lexer used for syntax highlighting can be invoked incrementally to 
+process only the changed part of a file, whereas lexers used in other contexts 
+are always called to process an entire file, or a complete language construction 
+embedded in a file in a different language. An important requirement for a 
+syntax highlighting lexer, required for incremental lexing, is that its state 
+must be represented by a single integer number (returned from <code>Lexer.getState()</code>). 
+That state will be passed to the <code>Lexer.start()</code> method, along with the start 
+offset of the fragment to process, when lexing is resumed from the middle of a 
+file. Lexers used in other contexts can always return 0 from the <code>getState()</code> method if 
+their state has a more complex internal representation.</p>
+<p>The easiest way to create a lexer for a custom language plugin is to use
+<a href="http://jflex.de/">JFlex</a>. IDEA contains adapter classes (<a href="help/openapi/com/intellij/lexer/FlexLexer.html">FlexLexer</a> 
+and 
+<a href="help/openapi/com/intellij/lexer/FlexAdapter.html">FlexAdapter</a>) that adapt JFlex lexers to the IDEA lexer 
+API. The Plugin Development package includes a patched version of JFlex 1.4.1 
+(tools/jflex) and lexer skeleton file (tools/jflex/idea-flex.skeleton) which can 
+be used for creating lexers compatible with FlexAdapter. The patched version of 
+JFlex provides a new command line option <code>--charat</code> which changes the JFlex 
+generated code so that it works with the IDEA skeleton (which passes the source 
+data for lexing as a CharSequence and not as an array of characters).</p>
+<p>Note that lexers, and in particular JFlex-based lexers, need to be created in 
+such a way that they always match the entire contents of the file, without any 
+gaps between tokens, and generate 
+special tokens for characters which are not valid at their location. Lexers must 
+never abort prematurely because of an invalid character.</p>
+<p>Types of tokens for lexers used in IDEA are defined by instances of 
+<a href="help/openapi/com/intellij/psi/tree/IElementType.html">IElementType</a>. A number of token types common for all 
+languages are defined in the 
+<a href="help/openapi/com/intellij/psi/TokenType.html">TokenType</a> interface; custom 
+language plugins should reuse these token types wherever applicable. For all other token types, 
+the plugin needs to create new <code>IElementType</code> instances and associate with 
+the language in which the token type is used. The same IElementType instance should be returned every time a particular token type is 
+encountered by the lexer.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JSTokenTypes.java.html#l29">
+	Example: JavaScript token type definitions</a></p>
+</blockquote>
+<p>An important feature which can be implemented at lexer level is mixing 
+languages within a file (for example, embedding fragments of Java code in some 
+template language). If a language supports embedding its fragments in another 
+language, it needs to define the <i>chameleon</i> token types for different 
+types of fragments which can be embedded, and these token types need to 
+implement the
+<a href="help/openapi/com/intellij/psi/tree/IChameleonElementType.html">
+IChameleonElementType</a> interface. The lexer of the enclosing language needs 
+to return the entire fragment of the embedded language as a single chameleon 
+token, of the type defined by the embedded language. To parse the contents of 
+the chameleon token, IDEA will call the parser of the embedded language through 
+a call to <code>IChameleonElementType.parseContents()</code>.</p>
+<h2>Implementing a Parser and PSI</h2>
+<p>Parsing files in IDEA is a two-step process. First, an abstract syntax tree 
+(AST) is built, defining the structure of the program. AST nodes are created 
+internally by IDEA and are represented by instances of the 
+<a href="help/openapi/com/intellij/lang/ASTNode.html">ASTNode</a> class. Each AST node has an associated element type (<code>IElementType</code> 
+instance), and the element types are defined by the language plugin. The 
+top-level node of the AST tree for a file needs to have a special element type, 
+implementing the
+<a href="help/openapi/com/intellij/psi/tree/IFileElementType.html">
+IFileElementType</a> interface. </p>
+<p>The AST nodes have a direct mapping to text ranges in the underlying document 
+(the bottom-most nodes of the AST match individual tokens returned by the lexer, 
+and higher level nodes match multiple-token fragments). Operations performed on 
+nodes of the AST tree (inserting, removing, reordering nodes and so on) are 
+immediately reflected as changes to the text of the underlying document.</p>
+<p>Second, a PSI (Program Structure Interface) tree is built on top of the AST, 
+adding semantics and methods for manipulating specific language constructs. 
+Nodes of the PSI tree are represented by classes implementing 
+the
+<a href="help/openapi/com/intellij/psi/PsiElement.html">PsiElement</a> 
+interface and are created by the language plugin in the 
+<code>ParserDefinition.createElement()</code> method. The top-level node of the 
+PSI tree for a file needs to implement the
+<a href="help/openapi/com/intellij/psi/PsiFile.html">
+PsiFile</a> interface, and is created in the <code>ParserDefinition.createFile()</code> 
+method.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JavascriptParserDefinition.java.html#l42">
+	Example: ParserDefinition implementation for JavaScript</a></p>
+</blockquote>
+<p>The process of building the AST and PSI trees for a file is invoked on 
+demand, when some component of IDEA tries to access the PSI for a file. The PSI 
+is always built when a file is opened in the editor, and it can also be built 
+when a file is affected by a multi-file operation (inspection, refactoring, 
+batch reformat and so on). After a document has been changed, building 
+a new PSI is initiated by <i>committing</i> the document. Methods for committing 
+a specific document or all documents are found in the
+<a href="help/openapi/com/intellij/psi/PsiDocumentManager.html">
+PsiDocumentManager</a> interface. The documents are committed by all IDEA 
+components which 
+need to access the PSI, and in particular by the thread which performs background highlighting.</p>
+<p>The base classes for the PSI implementation (<a href="help/openapi/com/intellij/extapi/psi/PsiFileBase.html">PsiFileBase</a>, 
+the base implementation of PsiFile, 
+and 
+<a href="help/openapi/com/intellij/extapi/psi/ASTWrapperPsiElement.html">ASTWrapperPsiElement</a>, 
+the base implementation of PsiElement) are provided by IDEA. However, 
+these classes are coupled to the internal implementation of IDEA and are located 
+in idea.jar. Because of this, every custom language plugin needs to include 
+idea.jar in its classpath. (If the plugin is built as a DevKit project, idea.jar 
+must be added to the list of JARs in the classpath of the IDEA SDK, and not 
+added as a separate module or project library. Otherwise, the plugin will not 
+work correctly.)</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/JSFile.java.html">
+	Example: PsiFile implementation for JavaScript</a></p>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/JSElement.java.html">
+	Example: base PsiElement implementation for JavaScript</a></p>
+</blockquote>
+<p>IDEA currently does not provide a ready way to reuse existing language 
+grammars (for example, from ANTLR) for creating custom language parsers. The 
+parsers need to be coded manually, as a recursive descent implementation.</p>
+<p>The language plugin provides the parser implementation as an implementation 
+of the 
+<a href="help/openapi/com/intellij/lang/PsiParser.html">PsiParser</a> interface, 
+returned from <code>ParserDefinition.createParser()</code>. The parser receives an instance of 
+the
+<a href="help/openapi/com/intellij/lang/PsiBuilder.html">PsiBuilder</a> class, which is used to get the stream of tokens from the 
+lexer and to hold the intermediate state of the AST being built. The parser must 
+process all tokens returned by the lexer up to the end of stream (until <code>
+PsiBuilder.getTokenType()</code> returns null), even if the tokens are not valid 
+according to the language syntax.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/parsing/JSParser.java.html">
+	Example: PsiParser implementation for JavaScript</a></p>
+</blockquote>
+<p>The parser works by setting pairs of markers (<a href="help/openapi/com/intellij/lang/PsiBuilder.Marker.html">PsiBuilder.Marker</a> instances) 
+within the stream of tokens received from the lexer. Each pair of markers 
+defines the range of lexer tokens for a single node in the AST tree. If a pair of markers is nested in another 
+pair (starts after its start and ends before its end), it becomes the child node 
+of the outer pair.</p>
+<p>The element type for the marker pair (and for the AST node created from it) 
+is specified when the end marker is set (by a call to <code>PsiBuilder.Marker.done()</code>). 
+Also, it is possible to drop a start marker before its end marker has been set. 
+The <code>drop()</code> method drops only a single start marker without 
+affecting any markers added after it, and the <code>rollbackTo()</code> method 
+drops the start marker and all markers added after it and reverts the lexer 
+position to the start marker. These methods can be used to implement lookahead 
+when parsing.</p>
+<p>The method <code>PsiBuilder.marker.precede()</code> is useful for 
+right-to-left parsing when you don't know how many markers you need at a certain 
+position until you read more input. For example, a binary expression a+b+c needs 
+to be parsed as ((a+b)+c). Thus, two start markers are needed at the position of 
+the token 'a', but that is not known until the token 'c' is read. When the 
+parser reaches the '+' token following 'b', it can call <code>precede()</code> 
+to duplicate the start marker at 'a' position, and then put its matching end 
+marker after 'c'.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/parsing/ExpressionParsing.java.html#l492">
+	Example: using precede() to parse additive expressions in JavaScript</a></p>
+</blockquote>
+<p>An important feature of PsiBuilder is its handling of whitespace and 
+comments. The types of tokens which are treated as whitespace or comments are 
+defined by the methods <code>getWhitespaceTokens()</code> and <code>getCommentTokens()</code> in the
+<code>ParserDefinition</code> class. PsiBuilder automatically omits whitespace and comment 
+tokens from the stream of tokens it passes to PsiParser, and adjusts the token 
+ranges of AST nodes so that leading and trailing whitespace tokens are not 
+included in the node.</p>
+<p>The token set returned from <code>ParserDefinition.getCommentTokens()</code> is also used 
+to search for TO DO items.</p>
+<p>In order to better understand the process of building a PSI tree for a simple 
+expression, you can refer to the attached <a href="PsiBuilder.gif">diagram</a>.</p>
+<p>In general, there is no single right way to implement a PSI for a custom 
+language, and the plugin author can choose the PSI structure and set of methods 
+which are the most convenient for the code which uses the PSI (error analysis, 
+refactorings and so on). However, there is one base interface which 
+needs to be used by a custom language PSI implementation in order to support 
+features like rename and find usages. Every element which can be renamed 
+or referenced (a class definition, a method definition and so on) needs to 
+implement the
+<a href="help/openapi/com/intellij/psi/PsiNamedElement.html">PsiNamedElement</a> interface, with methods 
+<code>getName()</code> and <code>setName()</code>.</p>
+<p>A number of functions which can be used for implementing and using the PSI 
+can be found in the
+<a href="help/openapi/com/intellij/psi/util/package-frame.html">
+com.intellij.psi.util</a> package, and in particular in the
+<a href="help/openapi/com/intellij/psi/util/PsiUtil.html">
+PsiUtil</a> and
+<a href="help/openapi/com/intellij/psi/util/PsiTreeUtil.html">
+PsiTreeUtil</a> classes.</p>
+<p>A very helpful tool for debugging the PSI implementation is the
+<a href="http://plugins.intellij.net/plugins/view/?id=PsiViewer">PsiViewer</a> 
+plugin. It can show you the structure of the PSI built by your plugin, the 
+properties of every PSI element and highlight the text range of every PSI 
+element.</p>
+<h2><a name="syntax_highlighting"></a>Syntax Highlighting and Error Highlighting</h2>
+<p>The class used in IDEA to specify how a particular range of text should be 
+highlighted is called 
+<a href="help/openapi/com/intellij/openapi/editor/colors/TextAttributesKey.html">TextAttributesKey</a>. 
+An instance of this class is created for every distinct type of item which 
+should be highlighted (keyword, number, string and 
+so on). The TextAttributesKey defines the default attributes which are applied 
+to items of the corresponding type (for example, keywords are bold, numbers are 
+blue, strings are bold and green). The mapping of the TextAttributesKey to 
+specific attributes used in an editor is defined by the
+<a href="help/openapi/com/intellij/openapi/editor/colors/EditorColorsScheme.html">
+EditorColorsScheme</a> class, and can be configured by the user if the plugin 
+provides an appropriate configuration interface. Highlighting from multiple TextAttributeKey 
+items can be overlaid &ndash; for example, one key may define an item's boldness and 
+another its color.</p>
+<p>The syntax and error highlighting is performed on multiple levels. 
+The first level of syntax highlighting is based on the lexer output, and is 
+provided through the 
+<a href="help/openapi/com/intellij/openapi/fileTypes/SyntaxHighlighter.html">SyntaxHighlighter</a> interface. 
+The syntax highligher returns the TextAttributeKey instances for each 
+token type which needs special highlighting. For highlighting lexer errors, the 
+standard TextAttributeKey for bad characters (<a href="help/openapi/com/intellij/openapi/editor/HighlighterColors.html#BAD_CHARACTER">HighligherColors.BAD_CHARACTER</a>) 
+can be used.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JSHighlighter.java.html#l37">
+	Example: SyntaxHighlighter implementation for JavaScript</a></p>
+</blockquote>
+<p>The second level of error highlighting happens during parsing. If a 
+particular sequence of tokens is invalid according to the grammar of the 
+language, the <code>PsiBuilder.error()</code> method can be used to highlight the invalid 
+tokens and display an error message showing why they are not valid.</p>
+<p>The third level of highlighting is performed through the 
+<a href="help/openapi/com/intellij/lang/annotation/Annotator.html">Annotator</a> interface. If the plugin returns an 
+instance of Annotator from <code>Language.getAnnotator()</code>, the annotator is called 
+during the background highlighting pass to process the elements in the PSI tree 
+of the custom language. The annotator can analyze not only the syntax, but also 
+the semantics of the text in the language, and thus can provide much more 
+complex syntax and error highlighting logic. The annotator can also provide 
+quick fixes to problems it detects.</p>
+<p>When the file is changed, the annotator is called incrementally to process 
+only changed elements in the PSI tree.</p>
+<p>To highlight a region of text as a warning or error, the annotator calls 
+<code>createErrorAnnotation()</code> or <code>createWarningAnnotation()</code> on the
+<a href="help/openapi/com/intellij/lang/annotation/AnnotationHolder.html">AnnotationHolder</a> 
+object passed to it, and optionally calls <code>registerFix()</code> on the returned 
+<a href="help/openapi/com/intellij/lang/annotation/Annotation.html">Annotation</a> object to add a quick fix for the error or warning. To apply 
+additional syntax highlighting, the annotator can call <code>AnnotationHolder.createInfoAnnotation()</code> with an empty message and then call
+<code>Annotation.setTextAttributes()</code> to specify the text attributes key for the 
+highlighting.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/validation/JSAnnotatingVisitor.java.html#l35">
+	Example: Annotator implementation for JavaScript</a></p>
+</blockquote>
+<p>Finally, if the custom language employs external tools for validating files 
+in the language (for example, uses the Xerces library for XML schema 
+validation), it can provide an implementation of the 
+<a href="help/openapi/com/intellij/lang/annotation/ExternalAnnotator.html">ExternalAnnotator</a> 
+interface. The ExternalAnnotator highlighting has the lowest priority and is 
+invoked only after all other background processing has completed. It uses the 
+same AnnotationHolder interface for converting the output of the external tool 
+into editor highlighting.</p>
+<p>The plugin can also provide a configuration interface to allow the user to 
+configure the colors used for highlighting specific items. In order to do that, 
+it should provide an implementation of 
+<a href="help/openapi/com/intellij/openapi/options/colors/ColorSettingsPage.html">ColorSettingPage</a> and register that implementation 
+with the 
+<a href="help/openapi/com/intellij/openapi/options/colors/ColorSettingsPages.html">ColorSettingPages</a> class.</p>
+<p>The &quot;Export to HTML&quot; feature of IDEA uses the same syntax highlighting 
+mechanism as the editor, so it will work automatically for custom languages 
+which provide a syntax highlighter.</p>
+<h2><a name="references"></a>References and Resolve</h2>
+<p>One of the most important and tricky parts in the implementation of a custom 
+language PSI is resolving references. Resolving references means the ability to 
+go from the usage of an element (access of a variable, call of a method and so 
+on) to the declaration of the element (the variable definition, the method 
+declaration and so on). This is obviously needed in order to support the IDEA 
+&quot;Go to Declaration&quot; action (Ctrl-B and Ctrl-Click), and it is also a 
+pre-requisite for the Find Usages action, the Rename refactoring and the code 
+completion.</p>
+<p>All PSI elements which work as references (for which the Go to Declaration 
+action applies) need to implement the <code>PsiElement.getReference()</code> 
+method and to return a
+<a href="help/openapi/com/intellij/psi/PsiReference.html">
+PsiReference</a> implementation from that method. The PsiReference interface is 
+usually implemented by the same class as PsiElement, but that does not need to 
+be the case. An element can also contain multiple references (for example, a 
+string literal can contain multiple substrings which are valid full-qualified 
+class names), in which case it can implement <code>PsiElement.getReferences()</code> 
+and return the references as an array.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/impl/JSReferenceExpressionImpl.java.html#l37">
+	Example: JavaScript reference expression implementation</a></p>
+</blockquote>
+<p>The main method of the PsiReference interface is <code>resolve()</code>, which returns the element to 
+which the reference points, or null if it was not possible to resolve the 
+reference to a valid element (for example, it points to an undefined class). A 
+counterpart to this method is <code>isReferenceTo()</code>, which checks if the reference 
+resolves to the specified element. The latter method can be implemented by 
+calling <code>resolve()</code> and comparing the result with the passed PSI element, but 
+additional optimizations (for example, performing the tree walk only if the text 
+of the element is equal to the text of the reference) are possible.</p>
+<p>IDEA provides a set of interfaces which can be used as a base for 
+implementing resolve support, namely the 
+<a href="help/openapi/com/intellij/psi/scope/PsiScopeProcessor.html">PsiScopeProcessor</a> interface and the 
+<code>PsiElement.processDeclarations()</code> method. These interfaces have a number of extra 
+complexities which are not necessary for most custom languages (like support for 
+substituting Java generics types), but they are required if the custom language 
+can have references to Java code. If Java interoperability is not required, the 
+plugin can forgo the standard interfaces and provide its own, different 
+implementation of resolve.</p>
+<p>The implementation of resolve based on the standard IDEA references contains 
+of the following components:</p>
+<ul>
+	<li>A class implementing the PsiScopeProcessor interface 
+	which gathers the possible declarations for the reference and stops the 
+	resolve process when it has successfully completed. The main method which 
+	needs to be implemented is <code>execute()</code>, which is called to process every 
+	declaration encountered during the resolve, and returns <code>true</code> if the resolve 
+	needs to be continued or <code>false</code> if the declaration has been found. (The 
+	methods <code>getHint()</code> and <code>handleEvent()</code> are used for internal IDEA optimizations 
+	and can be left empty in the PsiScopeProcessor implementations for custom 
+	languages.)
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/JSResolveUtil.java.html#l80">
+	(Example: PsiScopeProcessor for resolving JavaScript references)</a> </li>
+	<li>A function which walks the PSI tree up from the reference location until 
+	the resolve has successfully completed or until the end of the resolve scope 
+	has been reached.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/JSResolveUtil.java.html#35">
+	(Example: JavaScript tree walk function)</a>. If the target of the reference 
+	is located in a different file, the file can be located, for example, using 
+	the <code>getFilesByName()</code> method of the
+	<a href="help/openapi/com/intellij/psi/search/PsiShortNamesCache.html">
+	PsiShortNamesCache</a> interface (if the file name is known) or by iterating 
+	through all custom language files in the project (<code>iterateContent()</code> 
+	in the
+	<a href="help/openapi/com/intellij/openapi/roots/FileIndex.html">
+	FileIndex</a> interface obtained from
+	<a href="help/openapi/com/intellij/openapi/roots/ProjectRootManager.html">
+	ProjectRootsManager</a>.getFileIndex()).</li>
+	<li>The individual PSI elements, on which the <code>processDeclarations()</code> method 
+	is called during the PSI tree walk. If a PSI element is a declaration, it 
+	passes itself to the <code>execute()</code> method of the PsiScopeProcessor passed to it. 
+	Also, if necessary according to the language scoping rules, a PSI element 
+	can pass the PsiScopeProcessor to its child elements.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/impl/JSFunctionImpl.java.html#l77">
+	(Example: processDeclarations() for JavaScript functions)</a></li>
+</ul>
+<p>An extension of the PsiReference interface, which allows a reference to 
+resolve to multiple targets, is the 
+<a href="help/openapi/com/intellij/psi/PsiPolyVariantReference.html">PsiPolyVariantReference</a> interface. The 
+targets to which the reference resolves are returned from the <code>multiResolve()</code> 
+method. The Go to Declaration action for such references allows the user to choose the 
+target to navigate to. The implementation of <code>multiResolve</code> can be 
+also based on PsiScopeProcessor, and can collect all valid targets for the 
+reference instead of stopping when the first valid target is found.</p>
+<p>IDEA's &quot;Quick Definition Lookup&quot; action is based on the same mechanism as &quot;Go to 
+Declaration&quot;, so it becomes automatically available for all references which can 
+be resolved by the language plugin.</p>
+<h2><a name="code_completion"></a>Code Completion</h2>
+<p>The code completion for custom languages in IntelliJ IDEA is based on the 
+mechanism of references. The &quot;Complete Code &gt; Basic&quot; action is available when 
+the token at the caret in a custom language file is a reference, or when the 
+reference would be a valid token at the caret location.</p>
+<p>To fill the completion list, IDEA calls 
+<a href="help/openapi/com/intellij/psi/PsiReference.html#getVariants()">PsiReference.getVariants()</a> 
+either on the reference at the caret location or on a dummy reference that would 
+be placed at the caret. This method needs to return an array of objects 
+containing either strings, PsiElement instances or instances of the
+<a href="help/openapi/com/intellij/psi/infos/CandidateInfo.html">
+CandidateInfo</a> class (the latter applies mostly to Java and does not need to 
+be used in custom languages). If a PsiElement instance is returned in the array, 
+the completion list shows the icon for the element.</p>
+<p>The most common way to implement <code>getVariants()</code> is to use the 
+same function for walking up the tree as in <code>PsiReference.resolve()</code>, 
+and a different implementation of PsiScopeProcessor which collects all 
+declarations passed to its <code>processDeclarations()</code> method and returns 
+them as an array for filling the completion list.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/JSResolveUtil.java.html#l113">
+	Example: PsiScopeProcessor for gathering JavaScript completion variants</a></p>
+</blockquote>
+<h2><a name="find_usages"></a>Find Usages</h2>
+<p>The Find Usages action in IDEA is a multi-step process, and each step of the 
+process requires involvement from the custom language plugin. The language 
+plugin participates in the Find Usages process by providing implementations of 
+the 
+<a href="help/openapi/com/intellij/lang/findUsages/FindUsagesProvider.html">FindUsagesProvider</a> and 
+<a href="help/openapi/com/intellij/lang/cacheBuilder/WordsScanner.html">WordsScanner</a> interfaces, and the PSI 
+implementation (through PsiNamedElement and PsiReference interfaces).</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/findUsages/JavaScriptFindUsagesProvider.java.html#l39">
+	Example: FindUsagesProvider implementation for JavaScript</a></p>
+</blockquote>
+<p>The steps of the Find Usages action are the following:</p>
+<ul>
+	<li>Before the Find Usages action can be invoked, IDEA builds an index of 
+	words present in every file in the custom language. Using the WordsScanner 
+	implementation returned from <code>FindUsagesProvider.getWordsScanner()</code>, IDEA 
+	loads the contents of every file and passes it to the words scanner, along 
+	with the words consumer. The words scanner breaks the text into words, 
+	defines the context for each word (code, comments or literals) and passes 
+	the word to the consumer. The simplest way to implement the words scanner is 
+	to use the
+	<a href="help/openapi/com/intellij/lang/cacheBuilder/DefaultWordsScanner.html">DefaultWordsScanner</a> implementation, passing to it the sets of 
+	lexer token types which are treated as identifiers, literals and comments. 
+	The default words scanner will use the lexer to break the text into tokens, 
+	and will handle breaking the text of comment and literal tokens into 
+	individual words.</li>
+	<li>When the user invokes the Find Usages action, IDEA locates the PSI 
+	element the references to which will be searched. The PSI element at the 
+	cursor (the direct tree parent of the token at the cursor position) must be 
+	either a PsiNamedElement or a PsiReference which resolves to a 
+	PsiNamedElement. IDEA will use the word cache to search for the text 
+	returned from the <code>PsiNamedElement.getName()</code> method. Also, if the text range 
+	of the PsiNamedElement includes some other text besides the identifier 
+	returned from <code>getName()</code> (for example, if the PsiNamedElement represents a 
+	JavaScript function and its text range includes the &quot;function&quot; keyword in 
+	addition to the name of the function), the method <code>getTextOffset()</code> must be 
+	overridden for the PsiNamedElement, and must return the start offset of the 
+	name identifier within the text range of the element.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/impl/JSFunctionImpl.java.html#l72">
+	(Example: getTextOffset() implementation for JavaScript functions)</a> </li>
+	<li>Once the element is located, IDEA calls 
+	<code>FindUsagesProvider.canFindUsagesFor()</code> to ask the plugin if the Find Usages 
+	action is applicable to the specific element.</li>
+	<li>When showing the Find Usages dialog to the user, IDEA calls 
+	<code>FindUsagesProvider.getType()</code> and <code>FindUsagesProvider.getDescriptiveName()</code> to 
+	determine how the element should be presented to the user.</li>
+	<li>For every file containing the searched words, IDEA builds the PSI tree 
+	and recursively descends that tree. For every element in the tree for which 
+	<code>FindUsagesProvider.mayHaveReferences()</code> returns true, IDEA breaks the element 
+	text into words and scans them. If the element was indexed as an identifier, 
+	every word is checked to be a PsiReference resolving to the element the 
+	usages of which are searched. If the element was indexed as a comment or 
+	literal and the search in comments or literals is enabled, it checks if the 
+	word is equal to the name of the searched element.</li>
+	<li>After the usages are collected, IDEA shows the results in the usages pane. 
+	The text shown for each found element is taken from the <code>FindUsagesProvider.getNodeText()</code> 
+	method.</li>
+</ul>
+<h2><a name="rename_refactoring"></a>Rename Refactoring</h2>
+<p>The operation of the Rename refactoring in IDEA is quite similar to that of 
+Find Usages. IDEA uses the same rules for locating the element to be renamed, 
+and the same index of words for locating the files which may have references to 
+the element being renamed.</p>
+<p>When the rename refactoring is performed, the method <code>PsiNamedElement.setName()</code> 
+is called for the renamed element, and <code>PsiReference.handleElementRename()</code> is 
+called for all references to the renamed element. Both of these methods perform 
+basically the same action: replace the underlying AST node of the PSI element 
+with the node containing the new text entered by the user. Creating a fully 
+correct AST node from scratch is quite difficult. Thus, surprisingly, the 
+easiest way to get the replacement node is to create a dummy file in the custom 
+language so that it would contain the necessary node in its parse tree, build 
+the parse tree and extract the necessary node from it.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/impl/JSVariableImpl.java.html#l70">
+	Example: setName() implementation for JavaScript variables</a></p>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/psi/impl/JSChangeUtil.java.html#l37">
+	Example: Utility function for creating JavaScript name identifiers</a></p>
+</blockquote>
+<p>Another interface related to the Rename refactoring is 
+<a href="help/openapi/com/intellij/lang/refactoring/NamesValidator.html">NamesValidator</a>, which is new to the IDEA 5.0.1 
+release and was not present in the original 5.0 release. This interface allows a 
+plugin to check if the name entered by the user in the Rename dialog is a valid 
+identifier (and not a keyword) according to the custom language rules. If an 
+implementation of this interface is not provided by the plugin, Java rules for 
+validating identifiers are used.</p>
+<h2><a name="safe_delete_refactoring"></a>Safe Delete Refactoring</h2>
+<p>The Safe Delete refactoring also builds on the same Find Usages framework as 
+Rename. In addition to that, in order to support Safe Delete, a plugin needs to 
+implement two things:</p>
+<ul>
+	<li>The 
+	<a href="help/openapi/com/intellij/lang/refactoring/RefactoringSupportProvider.html">RefactoringSupportProvider</a> interface 
+	and the <code>isSafeDeleteAvailable()</code> method, which checks if the Safe Delete 
+	refactoring is available for a specific PSI element;</li>
+	<li>The <code>PsiElement.delete()</code> method for the PsiElement subclasses for which 
+	Safe Delete is available. Deleting PSI elements is implemented by deleting 
+	the underlying AST nodes from the AST tree (which, in turn, causes the text 
+	ranges corresponding to the AST nodes to be deleted from the document).</li>
+</ul>
+<h2><a name="code_formatter"></a>Code Formatter</h2>
+<p>IDEA 5.0 includes a powerful framework for implementing custom language 
+formatters. The process of formatting a file or a file fragment consists of the 
+following main steps:</p>
+<ul>
+	<li>The <i>formatting model builder </i>(<a href="help/openapi/com/intellij/formatting/FormattingModelBuilder.html">FormattingModelBuilder</a>), 
+	implemented by the plugin, provides a <i>formatting model</i> (<a href="help/openapi/com/intellij/formatting/FormattingModel.html">FormattingModel</a>) 
+	for the document to be formatted.</li>
+	<li>The formatting model is requested to build the structure of the file as 
+	applies to formatting, as a tree of <i>blocks (</i><a href="help/openapi/com/intellij/formatting/Block.html">Block</a>) 
+	with associated indent, wrap, alignment and spacing settings.</li>
+	<li>The formatting engine, provided by IDEA, calculates the sequence of 
+	whitespace characters (spaces, tabs and/or line breaks) that needs to be 
+	placed at every block boundary, based on the formatting model provided by 
+	the plugin.</li>
+	<li>The formatting model is requested to insert the calculated whitespace 
+	characters at necessary positions in the file.</li>
+</ul>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/formatter/blocks/JSBlock.java.html#l35">
+	Example: Block implementation for JavaScript</a></p>
+</blockquote>
+<p>The structure of blocks is usually built in such a way that it mirrors the 
+PSI structure of the file &ndash; for example, in Java code, the top-level 
+formatting block covers the entire file, its children cover individual classes 
+in the file, blocks on the next level cover methods inside classes, and so on. 
+The formatter modifies only the characters between blocks, and the tree of 
+blocks must be built in such a way that the bottom-level blocks cover all non-whitespace 
+characters in the file: otherwise the characters between blocks may be deleted 
+by the formatter.</p>
+<p>If the formatting operation does not affect the 
+entire file (for example, if the formatter is called to format the pasted block 
+of text), a complete tree of blocks is not built &ndash; rather, only blocks for the 
+text range covered by the formatting operation and their parents are built.</p>
+<p>For every block, the plugin specifies the 
+following properties:</p>
+<ul>
+	<li>The <i>indent</i> specifies how the block 
+	is indented relative to its parent block. There are different modes of 
+	indenting defined by factory methods in the 
+	<a href="help/openapi/com/intellij/formatting/Indent.html">Indent</a> 
+	class. The most commonly used are the none indent (which means the child 
+	block is not indented), the regular indent (the child block is indented by 
+	the number of spaces specified in the &quot;Project Code Style | General | 
+	Indent&quot; setting) and the continuation indent (based on &quot;Project Code Style | 
+	General | Continuation Indent&quot; setting). If the formatting model does not 
+	specify an indent, the &quot;continuation without first&quot; mode is used, which 
+	means that the first block in a sequence of blocks with that type is not 
+	indented and the following blocks are indented with a continuation indent.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/formatter/blocks/SubBlockVisitor.java.html#l77">
+	(Example: Calculating indent properties for JavaScript blocks)</a></li>
+	<li>The <i>wrap</i> (<a href="help/openapi/com/intellij/formatting/Wrap.html">Wrap</a>) 
+	specifies whether the content of the block is wrapped to the next line. Wrapping is performed by inserting a line break before 
+	the block content. The plugin can specify that a particular block is never 
+	wrapped, always wrapped, or wrapped only if it exceeds the right margin.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/formatter/blocks/SubBlockVisitor.java.html#l199">
+	(Example: Calculating wrap properties for JavaScript blocks)</a></li>
+	<li>The <i>alignment</i> (<a href="help/openapi/com/intellij/formatting/Alignment.html">Alignment</a>) 
+	specifies which blocks should be aligned with each other. If two blocks with 
+	the alignment property set to the same object instance are placed in 
+	different lines, and if the second block is the first non-whitespace block 
+	in its line, the formatter inserts white spaces before 
+	the second block so 
+	that it starts from the same column as the first one. Alignment takes 
+	precedence over indent: if it is found that two blocks should be aligned, 
+	the indent property of the second block is ignored.</li>
+	<li>The <i>spacing</i> (<a href="help/openapi/com/intellij/formatting/Spacing.html">Spacing</a>) 
+	specifies what spaces or line breaks are inserted between the specified 
+	children of the block. The spacing object specifies the minimum and maximum 
+	number of spaces that must be placed between the specified child blocks, the 
+	minimum number of line breaks to place there, and whether the existing line 
+	breaks and blank lines should be preserved. The formatting model can also 
+	specify that the spacing between the specified blocks may not be modified by 
+	the formatter.
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/formatter/JSSpacingProcessor.java.html#l100">
+	(Example: Calculating spacing for elements of 'if' statement in JavaScript)</a></li>
+</ul>
+<p>For each of these properties, a number of 
+special use settings exists, which are described in the JavaDoc comments for the 
+respective classes.</p>
+<p>An important special case in using the formatter 
+is the smart indent performed when the user presses the Enter key in a source 
+code file. To determine the indent for the new line, the formatter engine calls 
+the method <code>getChildAttributes()</code> on either the block immediately before the caret 
+or the parent of that block, depending on the return value of the <code>isIncomplete()</code> 
+method for the block before the caret. If the block before the cursor is 
+incomplete (contains elements that the user will probably type but has not yet 
+typed, like a closing parenthesis of the parameter list or the trailing 
+semicolon of a statement), <code>getChildAttributes()</code> is called on the block before 
+the caret; otherwise, it's called on the parent block.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/formatter/blocks/JSBlock.java.html#l92">
+	Example: getChildAttributes() implementation for JavaScript blocks</a></p>
+</blockquote>
+<h2><a name="code_inspections"></a>Code Inspections and Intentions</h2>
+<p>The code inspections for custom languages use the same API as all other code 
+inspections, based on the
+<a href="help/openapi/com/intellij/codeInspection/LocalInspectionTool.html">
+LocalInspectionTool</a> class. As the custom language may not have the same 
+concept of classes, fields and methods as Java, the <code>checkClass()</code>,
+<code>checkField()</code> and <code>checkMethod()</code> methods are not called 
+for custom language files. The custom language inspection needs to implement 
+only the <code>checkFile()</code> method, and to check if the PsiFile passed to 
+that method belongs to the custom language.</p>
+<p>The functionality of LocalInspectionTool partially duplicates that of 
+Annotator, and the main differences are that LocalInspectionTool supports batch 
+analysis of code (through the Analyze | Inspect Code... action), the possibility 
+to turn off the inspection and to configure the inspection options. If none of 
+that is required and the analysis only needs to run in the active editor, 
+Annotator provides better performance (because of its support for incremental 
+analysis) and more flexibility for highlighting errors.</p>
+<p>The code intentions for custom languages also use the regular API for 
+intentions. The intention classes need to implement the
+<a href="help/openapi/com/intellij/codeInsight/intention/IntentionAction.html">
+IntentionAction</a> interface and to be registered in the
+<a href="help/openapi/com/intellij/codeInsight/intention/IntentionManager.html">
+IntentionManager</a>.</p>
+<h2><a name="structure_view"></a>Structure View</h2>
+<p>The Structure View implementation used for a 
+specific file type in IDEA can be customized on many levels. If a custom 
+language plugin provides an implementation of the 
+<a href="help/openapi/com/intellij/ide/structureView/StructureView.html">StructureView</a> interface, it can completely 
+replace the standard structure view implementation with a custom user interface 
+component. However, for most languages this is not necessary, and the standard 
+Structure View implementation provided by IDEA can be reused.</p>
+<p>To reuse the IDEA implementation of the 
+Structure View, the plugin returns a 
+<a href="help/openapi/com/intellij/ide/structureView/TreeBasedStructureViewBuilder.html">TreeBasedStructureViewBuilder</a> from its 
+<code>Language.getStructureViewBuilder()</code> method. As the model for the builder, the 
+plugin can specify a subclass of
+<a href="help/openapi/com/intellij/ide/structureView/TextEditorBasedStructureViewModel.html">TextEditorBasedStructureViewModel</a>, and by 
+overriding methods of this subclass it customizes the structure view for a 
+specific language.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/structureView/JSStructureViewModel.java.html#l35">
+	Example: Structure view model implementation for JavaScript</a></p>
+</blockquote>
+<p>The main method to override is <code>getRoot()</code>, which 
+returns the instance of a class implementing the
+<a href="help/openapi/com/intellij/ide/structureView/StructureViewTreeElement.html">StructureViewTreeElement</a> interface. IDEA doesn't 
+provide a standard implementation of this interface, so a plugin will need to 
+implement it completely.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/structureView/JSStructureViewElement.java.html#l39">
+	Example: Structure view element implementation for JavaScript</a></p>
+</blockquote>
+<p>The structure view tree is usually built as a partial mirror of the PSI tree. In the 
+implementation of <code>StructureViewTreeElement.getChildren()</code>, the plugin can specify 
+which of the child elements of a specific PSI tree node need to be represented 
+as elements in the structure view. Another important method is <code>getPresentation()</code>, 
+which can be used to customize the text, attributes and icon used to represent 
+an element in the structure view.</p>
+<p>The implementation of <code>StructureViewTreeElement.getChildren()</code> needs to be 
+matched by <code>TextEditorBasedStructureViewModel.getSuitableClasses()</code>. The latter 
+method returns an array of PsiElement-derived classes which can be shown as 
+structure view elements, and is used to select the Structure View item matching 
+the cursor position when the structure view is first opened or when the &quot;Autoscroll 
+from source&quot; option is used.</p>
+<h2><a name="surround_with"></a>Surround With</h2>
+<p>In order to support the &quot;Code | Surround With...&quot; action, the plugin needs to 
+return an array of classes implementing the 
+<a href="help/openapi/com/intellij/lang/surroundWith/SurroundDescriptor.html">SurroundDescriptor</a> interface from its 
+<code>Language.getSurroundDescriptors()</code> method. Each of the surround descriptors 
+defines a possible type of code fragment which can be surrounded – for example, 
+one surround descriptor can handle surrounding expressions, and another can 
+handle statements. Each surround descriptor, in turn, contains an 
+array of
+<a href="help/openapi/com/intellij/lang/surroundWith/Surrounder.html">Surrounder</a> objects, defining 
+specific templates which can be used for surrounding the selected code fragment 
+(for example, &quot;Surround With if&quot;, &quot;Surround With for&quot; and so on). </p>
+<p>When the &quot;Surround With...&quot; action is invoked, IDEA queries all surround descriptors 
+for the language until it finds one that returns a non-empty array from its 
+<code>getElementsToSurround()</code> 
+method. Then it calls the <code>Surrounder.isApplicable()</code> method for each surrounder 
+in that descriptor to check if the specific template is 
+applicable in the current context. Once the user selects a specific surrounder 
+from the popup menu, the <code>Surrounder.surroundElements()</code> method is used to execute 
+the surround action.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/surroundWith/JSStatementsSurroundDescriptor.java.html">
+	Example: Surround descriptor for JavaScript statements</a></p>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/surroundWith/JSWithIfSurrounder.java.html#l29">
+	Example: Surrounder for 'if' statement in JavaScript</a></p>
+</blockquote>
+<h2><a name="go_to_class_symbol"></a>Go to Class and Go to Symbol</h2>
+<p>A custom language plugin can provide its own items to be included in the 
+lists shown by IDEA when the user chooses the &quot;Go to | Class...&quot; or &quot;Go to | 
+Symbol...&quot; action. In order to do so, the plugin must provide implementations 
+for the 
+<a href="help/openapi/com/intellij/navigation/ChooseByNameContributor.html">ChooseByNameContributor</a> interface (separate 
+implementations need to be provided for &quot;Go to Class&quot; and &quot;Go to Symbol&quot;), and 
+register them in the 
+<a href="help/openapi/com/intellij/navigation/ChooseByNameRegistry.html">ChooseByNameRegistry</a> component 
+(through <code>contributeToClasses()</code> and <code>contributeToSymbols()</code> methods).</p>
+<p>Each contributor needs to be able to return a complete list of names to show 
+in the list for a specified project, which will then be filtered by IDEA 
+according to the text typed by the user in the dialog. For each name in that 
+list, the contributor needs to provide a list of 
+<a href="help/openapi/com/intellij/navigation/NavigationItem.html">NavigationItem</a> instances 
+(typically PsiElements), which specify the destinations to jump to when a 
+specific name is selected from the list.</p>
+<h2>Additional Minor Features</h2>
+<p align="left"><a name="brace_matching"></a>In order to implement <b>brace matching</b>, 
+once the syntax highlighting lexer has been implemented, all that is required is 
+to implement the 
+<a href="help/openapi/com/intellij/lang/PairedBraceMatcher.html">
+PairedBraceMatcher</a> interface and to return an array of 
+<i>brace pairs</i> (<a href="help/openapi/com/intellij/lang/BracePair.html">BracePair</a>) for the language. Each brace pair specifies 
+the characters for the opening and closing braces and the lexer token types for 
+these characters. (In principle, it is possible to return multi-character 
+tokens, like &quot;begin&quot; and &quot;end&quot;, as the start and end tokens of a brace pair. 
+IDEA will match such braces, but the highlighting for such braces will 
+not be fully correct.) </p>
+<p align="left">Certain types of braces can be marked as <i>structural.</i> 
+Structural braces have higher priority than regular braces: they are matched 
+with each other even if there are unmatched braces of other types between them, 
+and an opening non-structural braces is not matched with a closing one if one of 
+them is inside a pair of matched structural braces and another is outside.</p>
+<blockquote>
+	<p align="left">
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JSBraceMatcher.java.html#l28">
+	Example: PairedBraceMatcher implementation for JavaScript</a></p>
+</blockquote>
+<p><a name="code_folding"></a>The <b>code folding</b> is controlled by the 
+plugin through the 
+<a href="help/openapi/com/intellij/lang/folding/FoldingBuilder.html">FoldingBuilder</a> interface. The 
+interface returns the list of text ranges which are foldable (as an array of
+<a href="help/openapi/com/intellij/lang/folding/FoldingDescriptor.html">
+FoldingDescriptor</a> objects), the replacement 
+text which is shown for each range when it is folded, and the default state of 
+each folding region (folded or unfolded).</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/folding/JavaScriptFoldingBuilder.java.html#l35">
+	Example: FoldingBuilder implementation for JavaScript</a></p>
+</blockquote>
+<p><a name="comment_code"></a>The <b>Comment Code</b> feature is controlled 
+through the 
+<a href="help/openapi/com/intellij/lang/Commenter.html">Commenter</a> interface. The interface can return the 
+prefix for the line comment, and the prefix and suffix for the block comment, if 
+such features are supported by the language.</p>
+<blockquote>
+	<p>
+	<a href="http://www.jetbrains.com/idea/pluginsamples/5.0/javascript/com/intellij/lang/javascript/JavascriptCommenter.java.html#l23">
+	Example: Commenter implementation for JavaScript</a></p>
+</blockquote>
+
+<p><a name="to_do_view"></a>The <b>To Do view</b> is supported automatically if 
+the plugin provides a words scanner, a highlighting lexer and a correct implementation of the <code>ParserDefinition.getCommentTokens()</code> 
+method.</p>
+<h3>Acknowledgements</h3>
+<p>Thanks to Maxim Shafirov, Olesya Smirnova, Keith Lea and Sascha Weinreuter for reviewing 
+drafts of this article.</p>
+
+</body>
+
+</html>

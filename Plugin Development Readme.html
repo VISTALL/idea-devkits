@@ -1,0 +1,119 @@
+<html>
+<head><title>IntelliJ IDEA Plugin Development Readme</title></head>
+<body>
+<h1>IntelliJ IDEA Plugin Development Readme</h1>
+<p>This file gives a quick overview of the contents of the IntelliJ IDEA
+Plugin Development Package.</p>
+
+<h2>Documentation and Source Code</h2>
+<p>The package includes the <a href="help/openapi/index.html">OpenAPI documentation</a>
+  and the <a href="lib/src/src_openapi.zip">source code</a> of the IntelliJ IDEA OpenAPI.</p>
+
+<p>The package also includes the following documents:</p>
+<ul>
+  <li><a href="Plugin%20Structure.html">Description of the overall plugin structure and the plugin.xml format</a></li>
+  <li><a href="Action%20System.html">Overview of the IntelliJ IDEA action system</a></li>
+  <li><a href="Custom%20Language%20Plugins.html">Developing custom language plugins for IntelliJ IDEA 5.x</a></li>
+</ul>
+
+<p>Additional documentation, including a
+  <a href="http://www.jetbrains.com/idea/documentation/howto_03.html">plugin development tutorial</a>,
+  is available on the <a href="http://www.jetbrains.com/idea/plugins/plugin_developers.html">JetBrains Web site</a>.
+</p>
+
+<h2>Example Plugins</h2>
+
+<p>The example plugins are small projects which demonstrate the usage of
+specific aspects of the IntelliJ IDEA OpenAPI and can serve as basis for
+your plugin projects.</p>
+
+<ul>
+  <li><a href="examples/plugin/plugin.ipr">Plugin sample</a> demonstrates
+    the smallest possible IntelliJ IDEA plugin, which implements the
+    <a href="help/openapi/com/intellij/openapi/components/ApplicationComponent.html">ApplicationComponent</a>
+    and <a href="help/openapi/com/intellij/openapi/components/ProjectComponent.html">ProjectComponent</a> interfaces.</li>
+  <li><a href="examples/actions/actions.ipr">Actions sample</a> demonstrates
+    adding actions to the IDEA toolbar and menu bar, through
+    <a href="help/openapi/com/intellij/openapi/actionSystem/AnAction.html">AnAction</a>
+    and related classes.</li>
+  <li><a href="examples/toolWindow/toolWindow.ipr">ToolWindow sample</a> demonstrates
+    adding a custom tool window to the IDEA user interface, through
+    <a href="help/openapi/com/intellij/openapi/wm/ToolWindow.html">ToolWindow</a>
+    and related classes.</li>
+  <li><a href="examples/vfs/vfs.ipr">VFS sample</a> demonstrates working with the
+    IDEA Virtual File System, through
+    <a href="help/openapi/com/intellij/openapi/vfs/VirtualFile.html">VirtualFile</a>
+    and related classes.</li>
+  <li><a href="examples/comparingReferences/comparingReferences.ipr">Comparing References sample</a>
+    is a sample code inspection which detects potentially incorrect uses of the
+    == and != operators and suggests to replace them with .equals() method calls.
+    The sample also demonstrates the usage of the IDEA PSI (Program Structure Interface) API.</li>
+  <li><a href="examples/conditionalOperatorConvertor/conditionalOperatorConvertor.ipr">Conditional Operator Converter sample</a>
+    is a sample intention action which allows to replace usages of the ternary
+    operator (? :) with corresponding 'if' statements.
+    The sample also demonstrates the usage of the IDEA PSI (Program Structure Interface) API.</li>
+</ul>
+
+<h2>Plugin Source Code</h2>
+
+<p>The package includes the source code for a number of plugins supplied with
+IntelliJ IDEA.</p>
+
+<h3>Source Control Integration</h3>
+
+<ul>
+  <li><a href="plugins/vssIntegration/src/src_vssIntegration.zip">Visual SourceSafe integration</a></li>
+  <li><a href="plugins/starteamIntegration/src/src_starteamIntegration.zip">StarTeam integration</a></li>
+  <li><a href="plugins/svn4idea/src/src_svn4idea.zip">Subversion integration</a></li>
+  <li><a href="plugins/PerforceIntegration/src/src_PerforceIntegration.zip">Perforce integration</a></li>
+</ul>
+
+<h3>Application Server Integration</h3>
+
+<ul>
+  <li><a href="plugins/weblogicIntegration/src/src_weblogicIntegration.zip">WebLogic
+    integration</a></li>
+  <li><a href="plugins/tomcat/src/src_tomcat.zip">Tomcat integration</a></li>
+  <li><a href="plugins/jsr45debug/src/src_jsr45debug.zip">Debugging support for JSR-45 compatible
+    application servers</a></li>
+</ul>
+
+<h3>Other Plugins</h3>
+
+<ul>
+  <li><a href="plugins/devkit/src/src_devkit.zip">Plugin Development Kit</a></li>
+  <li><a href="plugins/images/src/src_images.zip">Images support plugin</a></li>
+  <li><a href="plugins/InspectionGadgets/src/InspectionGadgets.zip">InspectionGadgets plugin</a>
+    (implements more than 400 code inspections)</li>
+  <li><a href="plugins/IntentionPowerPack/src/IntentionPowerPack.zip">IntentionPowerPack plugin</a>
+    (implements more than 40 intention actions)</li>
+  <li><a href="plugins/j2meplugin/src/src_j2meplugin.zip">J2ME development support plugin</a></li>
+  <li><a href="plugins/JavascriptLanguage/src/src_JavascriptLanguage.zip">JavaScript support plugin</a>
+    (demonstrates the use of IntellJ IDEA 5.x Language API)</li>
+  <li><a href="plugins/zkm/src/src_zkm.zip">KlassMaster stacktrace unscramble plugin</a></li>
+</ul>
+
+<h2>Development Tools</h2>
+
+The <a href="tools/jflex">tools/jflex</a> directory includes the patched version of
+<a href="http://jflex.de/">JFlex 1.4.1</a>, which can be used for compiling custom language
+lexers. This version of JFlex is required for recompiling the lexer of the JavaScript support
+plugin included in the distribution.
+
+<h2>Start Creating Your Own Plugin</h2>
+
+<p>An extensive tutorial for developing plugins with IntelliJ IDEA 5.1 is available on
+  <a href="http://www.jetbrains.com/idea/documentation/howto_03.html">JetBrains Web site</a>.
+</p>
+
+<h2>Additional Plugin Development Resources</h2>
+
+<ul>
+  <li>You can discuss any issues related to the IntelliJ IDEA OpenAPI with the JetBrains team and other
+    plugin developers in the <a href="news://news.jetbrains.com/jetbrains.intellij.openapi">jetbrains.intellij.openapi</a>
+    newsgroup or in the corresponding <a href="http://intellij.net/forums/forum.jsp?forum=23">Web forum</a>.</li>
+  <li>Once your plugin is ready, you can upload it to the <a href="http://plugins.intellij.net">IntelliJ IDEA Plugin Repository</a>.</li>
+</ul>
+
+</body>
+</html>

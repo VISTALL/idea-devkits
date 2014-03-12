@@ -1,0 +1,344 @@
+<html>
+<head>
+<title>IntelliJ IDEA Plug-In Structure</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<style type="text/css">
+.S0 {
+	font-family: Verdana;
+	color: #000000;
+	font-size: 10pt;
+}
+.S1 {
+	color: #000080;
+}
+.S3 {
+	color: #008080;
+}
+.S6 {
+	color: #7F007F;
+}
+.S8 {
+	color: #800080;
+}
+.S9 {
+	color: #808000;
+}
+.S11 {
+	color: #000080;
+}
+.S19 {
+	color: #608060;
+}
+span {
+	font-family: Verdana;
+	font-size: 10pt;
+}
+</style>
+</head>
+<body bgcolor="#FFFFFF" text="#000000">
+<h1>IntelliJ IDEA Plugin Structure</h1>
+<h2>Purpose</h2>
+<p>Plugins are the only possible way for third parties to extend IDEA functionality.
+  Every plugin uses API exposed by IDEA or other plugins to implement its functionality.
+  This document is focused on plugin system architecture and plugin lifecycle.
+  It doesn&#8217;t specify any of the other APIs which may be used by plugins.</p>
+<h2>Plugin Content </h2>
+<p>There are 3 ways how to organize plugin content:</p>
+<p>1. Plugin consists of one .jar file placed in IDEA_HOME/plugins/. The archive
+  should contain configuration file (META-INF/plugin.xml) and classes which implement
+  the plugin functionality. Configuration file specifies plugin name, description,
+  version, vendor, IDEA version plugin is supposed to be used with, plugin components,
+  actions and action groups, action user interface placement. </p>
+<pre>IDEA_HOME<br>	Plugins
+		Sample.jar/
+			com/foo/.....
+				...
+				...
+			META-INF
+				plugin.xml
+</pre>
+<p><br>
+  2. Plugin files are located in a folder:</p>
+<pre>IDEA_HOME<br>	Plugins
+		Sample
+			lib
+				libfoo.jar
+				libbar.jar
+			classes
+				com/foo/.....
+				...
+				...
+			META-INF
+				plugin.xml
+</pre>
+<p>The 'classes' folder and all jars located in the 'lib' folder are automatically
+  added to the classpath.</p>
+<p>3. Plugin files are located in a jar-file which is placed to the lib folder:</p>
+<pre>IDEA_HOME<br>	Plugins
+		Sample
+			lib
+				libfoo.jar
+				libbar.jar
+				Sample.jar/
+    				com/foo/.....
+	    			...
+					...
+					META-INF
+						plugin.xml
+</pre>
+<p>All the jars from 'lib' folder are automatically added to the classpath.</p>
+<h2>Plugin Class Loaders</h2>
+<p>For loading the classes of each plugin, IDEA uses a separate class loader. 
+This allows each plugin to use a different version of some library, even if the 
+same library is used by IDEA itself or another plugin.</p>
+<p>By default, the classes not found in the plugin class loader are loaded 
+through the main IDEA class loader. However, it is possible to use the <code>depends</code>
+element in plugin.xml to specify that a plugin depends on one or more other 
+plugins. In this case, the class loaders of those plugins will be used for 
+classes not found in the current plugin. This allows a plugin to reference 
+classes from other plugins.</p>
+<h2>Plugin Components </h2>
+<p>Components are the fundamental concept of plugins integration. There are
+three
+  kinds of components:
+<a href="help/openapi/com/intellij/openapi/components/ApplicationComponent.html">application-level</a>,
+<a href="help/openapi/com/intellij/openapi/components/ProjectComponent.html">project-level</a>
+and <a href="help/openapi/com/intellij/openapi/module/ModuleComponent.html">
+module-level</a>.
+  Application-level components are created and initialized on IDEA start-up. Project-level
+  components are created for each <a href="help/openapi/com/intellij/openapi/project/Project.html">Project</a>
+  instance present in IDEA (please note that components might be created for even
+  unopened projects). Module-level components are created for each
+<a href="help/openapi/com/intellij/openapi/module/Module.html">Module</a> in
+every project loaded in IDEA.</p>
+<p>Application-level components can be acquired from the <a href="help/openapi/com/intellij/openapi/components/ApplicationComponent.html">Application</a>
+  instance with getComponent(Class) method. Project-level components can be acquired
+  from the <a href="help/openapi/com/intellij/openapi/project/Project.html">Project</a>
+  instance with getComponent(Class) method. Module-level component can be
+acquired from <a href="help/openapi/com/intellij/openapi/module/Module.html">
+Module</a>
+  instance with the same method method.</p>
+<p>Every component should have interface and implementation classes specified
+  in the configuration file. The interface class will be used for retrieving the
+  component from other components and the implementation class will be used for
+  component instantiation. Note that two components of the same level (Application, Project
+or Module) cannot have the same interface class. Interface and implementation
+  classes can be the same.</p>
+<p>Each component has the unique name which is used for its externalization and
+  other internal needs. The name of component is returned by its
+<a href="help/openapi/com/intellij/openapi/components/BaseComponent.html#getComponentName()">getComponentName()</a>
+  method.</p>
+<h3>Components Naming Notation</h3>
+<p>It's recommended to name components in plugin_name.component_name form.</p>
+<h3>Application Level Components</h3>
+<p>Application-level component's implementation class should implement the
+<a href="help/openapi/com/intellij/openapi/components/ApplicationComponent.html">ApplicationComponent</a>
+  interface. An application component which has no dependencies should have a constructor with no parameters which will be used
+  for its instantiation. If an application component depends on other application components, it can specify these components as constructor parameters, and IDEA will ensure that the components are instantiated in correct order to satisfy the dependencies.</p>
+<h3>Project Level Components </h3>
+<p>Project-level component's implementation class should implement the
+<a href="help/openapi/com/intellij/openapi/components/ProjectComponent.html">ProjectComponent</a>
+  interface. The constructor of a project-level component can have a parameter of type
+<a href="help/openapi/com/intellij/openapi/project/Project.html">Project</a>, if it needs the project instance. It can also specify other application-level or project-level components  as parameters, it it depends on those components.</p>
+<h3>Module Level Components </h3>
+<p>Module-level component's implementation class should implement the
+<a href="help/openapi/com/intellij/openapi/components/ProjectComponent.html">
+ModuleComponent</a>
+  interface. The constructor of a module-level component can have a parameter of type
+<a href="help/openapi/com/intellij/openapi/module/Module.html">Module</a>, if it needs the module instance.
+  It can also specify other application-level, project-level or module-level components  as parameters,
+  it it depends on those components.</p>
+<h3>Plug-In Components Configuration </h3>
+<p>The state of every component will be automatically saved and loaded if the component
+  implements the
+<a href="help/openapi/com/intellij/openapi/util/JDOMExternalizable.html">JDOMExternalizable</a> interface. <br>
+  The state of application-level components state is saved in the XML file with
+the same name as the plugin in the config/plugins subfolder of the IDEA settings
+folder.<br>
+  Project-level components save their state to the project (.ipr) file. If <code>workspace</code>
+  option in the plugin.xml is set to true, the component will save its configuration
+  to the workspace (.iws) file instead of project (.ipr) file.<br>
+Module-level components save their state to the module (.iml) file.<br>
+  Note that a component should always be ready to save its state.</p>
+<h3>Defaults</h3>
+<p> Defaults (components' predefined settings) should be placed in the component_name.xml 
+file. Put this file in the plugin's classpath in the folder corresponding to
+  the default package. <code>readExternal()</code> method will be called on the &lt;component&gt;
+  root tag. If component has defaults, the <code>readExternal()</code> method is called twice: the
+  first time for defaults and the second time for saved configuration.</p>
+<h3>Plug-In Components Lifecycle</h3>
+The components are loaded in the following order:<ul>
+  <li>Creation - constructor is invoked</li>
+  <li>Initialization - the
+	<a href="help/openapi/com/intellij/openapi/components/BaseComponent.html#initComponent()">initComponent</a>
+    method is invoked</li>
+  <li>Configuration - the
+	<a href="help/openapi/com/intellij/openapi/util/JDOMExternalizable.html#readExternal()">readExternal</a>
+    method is invoked (if component implements <a href="help/openapi/com/intellij/openapi/util/JDOMExternalizable.html">JDOMExternalizable</a> interface)</li>
+	<li>For module components, the <a href="help/openapi/com/intellij/openapi/module/ModuleComponent.html#moduleAdded()">moduleAdded</a>
+          method is invoked to notify that a module has been added to the project</li>
+  <li>For project components, the <a href="help/openapi/com/intellij/openapi/components/ProjectComponent.html#projectOpened()">projectOpened</a>
+    method is invoked to notify that a project has been loaded</li>
+</ul>
+<p>The components are unloaded in the following order:</p>
+<ul>
+  <li>Saving configuration - the
+	<a href="help/openapi/com/intellij/openapi/util/JDOMExternalizable.html#writeExternal(org.jdom.Element)">writeExternal</a>
+    method is invoked (if component implements <a href="help/openapi/com/intellij/openapi/util/JDOMExternalizable.html">JDOMExternalizable</a> interface)</li>
+  <li> Disposal - <a href="help/openapi/com/intellij/openapi/components/BaseComponent.html#disposeComponent()">disposeComponent</a>
+    method is invoked</li>
+</ul>
+<p>Note that you should not request any other components in the constructor of
+  your component, otherwise you'll get an assertion. If you need access to other
+  components when initializing your component you can access them in the initComponent
+  method. </p>
+<h2>Plug-In Configuration (plugin.xml)</h2>
+<p>Here is a sample plugin configuration file. This sample showcases and 
+describes all elements which can be used in the plugin.xml file.</p>
+<p><span><span class="S9">&lt;!-- url=&quot;&quot; specifies the URL of the plugin 
+homepage (displayed in the Welcome Screen and in &quot;Plugins&quot; settings dialog) --&gt;<br>
+</span><span class="S1">&lt;idea-plugin </span><span class="S3">url</span><span class="S8">=</span><span class="S19">&#8221;</span><span class="S6">http://www.jetbrains.com/idea</span><span class="S19">&#8221;</span><span class="S1">&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Plugin name --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;name&gt;</span><span class="S0">VssIntegration</span><span class="S1">&lt;/name&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Unique identifier of the plugin. Must not change between plugin versions. If 
+not specified, assumed to be equal to &lt;name&gt;. --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;id&gt;</span><span class="S0">VssIntegration</span><span class="S1">&lt;/id&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Description of the plugin. --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;description&gt;</span><span class="S0">Vss 
+integration plugin</span><span class="S1">&lt;/description&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Description of changes in the latest version of the plugin. Displayed in the 
+&quot;Plugins&quot; settings dialog and in the plugin repository Web interface. --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;change-notes&gt;</span><span class="S0">Initial 
+release of the plugin</span><span class="S1">.&lt;/change-notes&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Plugin version --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;version&gt;</span><span class="S0">1.0</span><span class="S1">&lt;/version&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!-- 
+The vendor of the plugin. The optional &quot;url&quot; attribute specifies the URL of the 
+vendor homepage. The optional &quot;email&quot; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; attribute specifies 
+the e-mail address of the vendor. The optional &quot;logo&quot; attribute specifies the 
+path within the plugin JAR<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; to a 16x16 icon 
+which is displayed next to the plugin name in the welcome screen.&nbsp;&nbsp; --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;vendor </span>
+<span class="S3">url</span><span class="S8">=</span><span class="S6">"http://www.jetbrains.com&quot; </span>
+<span class="S3">email</span><span class="S8">=</span><span class="S6">"support@jetbrains.com&quot; </span>
+<span class="S3">logo</span><span class="S8">=</span><span class="S6">"icons/plugin.png&quot;</span><span class="S1">&gt;</span><span class="S0">Foo
+  Inc.</span><span class="S1">&lt;/vendor&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!-- The unique identifiers of 
+the plugins on which this plugin depends. --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;depends&gt;</span><span class="S0">MyFirstPlugin</span><span class="S1">&lt;/depends&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;depends&gt;</span><span class="S0">MySecondPlugin</span><span class="S1">&lt;/depends&gt;<br>
+<br>
+&nbsp;&nbsp;&nbsp; </span><span class="S9">&lt;!-- Allows a plugin to integrate its 
+help system (in JavaHelp format) with the IDEA help system. The &quot;file&quot; attribute 
+specifies the name of the JAR file <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; in the &quot;help&quot; 
+subdirectory of the plugin directory. The &quot;path&quot; attribute specifies the name of 
+the helpset file within the JAR file.--&gt;</span><span class="S0"><br />
+  </span><span class="S1">&nbsp;&nbsp;&nbsp; &lt;helpset</span><span class="S8">
+  </span><span class="S3">file</span><span class="S8">=</span><span class="S6">"myhelp.jar&quot;</span><span class="S8">
+  </span><span class="S3">path</span><span class="S8">=</span><span class="S6">"/Help.hs&quot;</span><span class="S8">
+  </span><span class="S11">/&gt;</span><span class="S1"><br>
+&nbsp;&nbsp;&nbsp; <br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Minimum and maximum build of IDEA compatible with the plugin --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;idea-version</span><span class="S8">
+  </span><span class="S3">since-build</span><span class="S8">=</span><span class="S19">&#8221;3000&#8221;</span><span class="S8">
+  </span><span class="S3">until-build</span><span class="S8">=</span><span class="S19">&#8221;3999&#8221;</span><span class="S8">/</span><span class="S1">&gt;</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!-- 
+Plugin's application components --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;application-components&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;component&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Component's interface class --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;interface-class&gt;</span><span class="S0">com.foo.Component1Interface</span><span class="S1">&lt;/interface-class&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Component's implementation class --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;implementation-class&gt;</span><span class="S0">com.foo.impl.Component1Impl</span><span class="S1">&lt;/implementation-class&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/component&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/application-components&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!-- 
+Plugin's project components --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;project-components&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;component&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Interface and implementation classes are the same --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;interface-class&gt;</span><span class="S0">com.foo.Component2</span><span class="S1">&lt;/interface-class&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Save state to the .iws instead of .ipr --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;option</span><span class="S8">
+  </span><span class="S3">name</span><span class="S8">=</span><span class="S6">"workspace"</span><span class="S8">
+  </span><span class="S3">value</span><span class="S8">=</span><span class="S6">"true"</span><span class="S8">
+  </span><span class="S11">/&gt;</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/component&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/project-components&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!-- Plugin's module components --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;module-components&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;component&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;interface-class&gt;</span><span class="S0">com.foo.Component3</span><span class="S1">&lt;/interface-class&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/component&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/module-components&gt;</span><span class="S0"><br />
+  <br>
+&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  <a href="Action%20System.html">Actions</a> --&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;actions&gt;</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;action</span><span class="S8">
+  </span><span class="S3">id</span><span class="S8">=</span><span class="S6">"VssIntegration.GarbageCollection"</span><span class="S8">
+  </span><span class="S3">class</span><span class="S8">=</span><span class="S6">"com.foo.impl.CollectGarbage"</span><span class="S8">
+  </span><span class="S3">text</span><span class="S8">=</span><span class="S6">"Collect
+  _Garbage"</span><span class="S8"> </span><span class="S3">description</span><span class="S8">=</span><span class="S6">"Run
+  garbage collector"</span><span class="S1">&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;keyboard-shortcut</span><span class="S8">
+  </span><span class="S3">first-keystroke</span><span class="S8">=</span><span class="S6">"control
+  alt G"</span><span class="S8"> </span><span class="S3">second-keystroke</span><span class="S8">=</span><span class="S6">"C"</span><span class="S8">
+  </span><span class="S3">keymap</span><span class="S8">=</span><span class="S6">"$default"</span><span class="S11">/&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/action&gt;<br>
+</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/actions&gt;</span><span class="S0"><br />
+  </span> <span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Extension points defined by the plugin. Extension points are registered by a 
+plugin so that other plugins can provide this plugin <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; with certain data. 
+The &quot;beanClass&quot; attribute specifies the class the implementations of which can 
+be used for the extension point. --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;extensionPoints&gt;</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;extensionPoint</span><span class="S8">
+  </span><span class="S3">name</span><span class="S8">=</span><span class="S6">"testExtensionPoint"</span><span class="S8">
+  </span><span class="S3">beanClass</span><span class="S8">=</span><span class="S6">"com.foo.impl.MyExtensionBean"</span><span class="S11">/&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/extensionPoints&gt;<br>
+</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S9">&lt;!--
+  Extensions which the plugin adds to extension points defined by the IDEA core 
+or by other plugins. The &quot;xmlns&quot; attribute specifies<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the ID of the plugin 
+defining the extension point, or &quot;com.intellij&quot; if the extension point is 
+defined by the IDEA core. The name of the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; tag within the 
+&lt;extensions&gt; tag matches the name of the extension point, and the 
+&quot;implementation&quot; class specifies the name of the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; class added to the 
+extension point. --&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;extensions </span>
+<span class="S3">xmlns</span><span class="S8">=</span><span class="S6">"VssIntegration"</span><span class="S1">&gt;</span><span class="S0">&nbsp;&nbsp;&nbsp;&nbsp;<br />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;testExtensionPoint</span><span class="S8">
+  </span><span class="S3">implementation</span><span class="S8">=</span><span class="S6">"com.foo.impl.MyExtensionImpl"</span><span class="S11">/&gt;</span><span class="S0"><br />
+  &nbsp;&nbsp;&nbsp;&nbsp;</span><span class="S1">&lt;/extensions&gt;</span><span class="S0"><br />
+  </span><span class="S1">&lt;/idea-plugin&gt;</span></span></p>
+</body>
+</html>
